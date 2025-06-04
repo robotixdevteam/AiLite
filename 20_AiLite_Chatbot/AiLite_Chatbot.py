@@ -1,12 +1,12 @@
-
 import requests
 import speech_recognition as sr
 import time
 import http.client
+ 
 bot_num = input("Enter bot number : ")
-host="192.168."+bot_num+".10"
+host = "192.168." + bot_num + ".10"
 port = 80
-
+ 
 def send_re_httpquest(host, port, path):
     """Send HTTP request with retries."""
     retries = 10  # Number of retries
@@ -26,25 +26,24 @@ def send_re_httpquest(host, port, path):
             if conn:
                 conn.close()
     return None  # Return None if all retries fail
-
-
+ 
 def act_yes():
-  path1=f"/?cmd=f(500)"
-  send_re_httpquest(host, port, path1)
-  path2=f"/?cmd=b(500)"
-  send_re_httpquest(host, port, path2)
-  
+    path1 = f"/?cmd=f(500)"
+    send_re_httpquest(host, port, path1)
+    path2 = f"/?cmd=b(500)"
+    send_re_httpquest(host, port, path2)
+ 
 def act_no():
-  path3=f"/?cmd=r(500)"
-  send_re_httpquest(host, port, path3)
-  path4=f"/?cmd=l(1000)"
-  send_re_httpquest(host, port, path4)
-  path5=f"/?cmd=r(500)"
-  send_re_httpquest(host, port, path5)
-
+    path3 = f"/?cmd=r(500)"
+    send_re_httpquest(host, port, path3)
+    path4 = f"/?cmd=l(1000)"
+    send_re_httpquest(host, port, path4)
+    path5 = f"/?cmd=r(500)"
+    send_re_httpquest(host, port, path5)
+ 
 # Initialize recognizer class
 recognizer = sr.Recognizer()
-
+ 
 # Capture data from the microphone
 with sr.Microphone() as source:
     print("Say something!")
@@ -52,39 +51,54 @@ with sr.Microphone() as source:
     audio_data = recognizer.listen(source)
     try:
         # Recognize speech using Google Web Speech API
-        question = recognizer.recognize_google(audio_data) #Comment it out for text input
+        question = recognizer.recognize_google(audio_data)
         print("You said: " + question)
     except sr.UnknownValueError:
         print("Google Speech Recognition could not understand audio")
     except sr.RequestError as e:
         print("Could not request results from Google Speech Recognition service; {0}".format(e))
-
-API_URL = "https://api-inference.huggingface.co/models/google/gemma-1.1-7b-it"
-headers = {"Authorization": "Bearer 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"}
+ 
+# Use Together API with DeepSeek-R1 model
+API_URL = "https://router.huggingface.co/together/v1/chat/completions"
+headers = {
+    "Authorization": "Bearer hf_wrsJaMfqQkviTxftOsNJBzLDeodRvm145", #Replace your API Key Here
+}
+ 
 def query(payload):
     response = requests.post(API_URL, headers=headers, json=payload)
     return response.json()
-#questions=input("Question: ")
-questions=question +" Yes or NO "
-output = query({
-    "inputs": questions,
-    "parameters": {
-        "role": "you are chat assistant",  # Add the desired role here
-        "temperature": 0.1   # Set the temperature for generation
-    }
+ 
+# Prepare the question with strict yes/no requirement
+formatted_question = f"{question} Answer strictly with only 'yes' or 'no' and nothing else."
+ 
+response = query({
+    "messages": [
+        {
+            "role": "user",
+            "content": formatted_question
+        }
+    ],
+    "model": "deepseek-ai/DeepSeek-R1"
 })
-text = output[0]['generated_text']
-text = text.replace('\n', ' ')
-parts = text.split("Answer")
-parts1_upper = parts[1].upper()
-count_yes = parts1_upper.count("YES")
-count_no = parts1_upper.count("NO")
-
-if count_yes >= 1:
+ 
+# Extract the assistant's response
+assistant_response = response["choices"][0]["message"]["content"]
+ 
+# Remove the <think>...</think> part if present
+if "<think>" in assistant_response and "</think>" in assistant_response:
+    final_response = assistant_response.split("</think>")[1].strip()
+else:
+    final_response = assistant_response
+ 
+# Clean up the response and make it uppercase for comparison
+clean_response = final_response.strip().upper()
+ 
+# Determine action based on response
+if "YES" in clean_response:
     print("Yes")
     act_yes()
-
-elif count_no >= 1:
-    answer="No"
+elif "NO" in clean_response:
     print("No")
     act_no()
+else:
+    print("Could not determine yes/no answer from response:", final_response)
