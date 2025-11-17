@@ -47,6 +47,14 @@ Make sure it you create conda environmen and download requirements.txt in the pr
 First create a new conda environment with the following command:
 
 ```bash
+conda tos view
+```
+
+```bash
+conda tos accept
+```
+
+```bash
 conda create -n <environment_name> python=3.11 -y
 ```
 
